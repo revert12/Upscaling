@@ -7,6 +7,7 @@ echo "pip version: $(pip3 --version)"
 # 2. CUDA와 호환되는 PyTorch와 torchvision 설치
 echo "Installing PyTorch and torchvision..."
 pip3 install torch==2.0.1 torchvision==0.15.2 --extra-index-url https://download.pytorch.org/whl/cu118
+pip install 'numpy<2'
 
 # 3. Real-ESRGAN 리포지토리 클론
 echo "Cloning Real-ESRGAN repository..."
