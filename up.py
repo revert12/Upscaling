@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 import os
 import ffmpeg
 import cv2
@@ -82,7 +83,9 @@ def upscale_video(input_video_path, output_video_path, temp_frame_folder="frames
     
     print(f"업스케일링 완료! 결과는 {output_video_path}에 저장되었습니다.")
 
-# 실행 예시
-input_video = "../Downloads/seoul_park_30m.mp4"
-output_video = "../Downloads/seoul_park_30m_up.mp4"
-upscale_video(input_video, output_video)
+# 스크립트를 직접 실행할 때 메인 함수 호출
+if __name__ == "__main__":
+    # 실행 예시
+    input_video = "../Downloads/seoul_park_30m.mp4"  # 입력 동영상 경로
+    output_video = "../Downloads/seoul_park_30m_up.mp4"  # 출력 동영상 경로
+    upscale_video(input_video, output_video)
