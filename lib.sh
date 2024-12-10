@@ -1,1 +1,1 @@
-pip install ffmpeg-python realesrgan
+pip install ffmpeg-python opencv-python basicsr realesrgan numpy
