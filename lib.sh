@@ -11,3 +11,4 @@ python setup.py develop
 # 윈도우에서는 FFmpeg를 https://ffmpeg.org/download.html에서 다운로드하고 PATH에 추가
 # macOS에서는: brew install ffmpeg
 # 리눅스에서는: sudo apt-get install ffmpeg
+sudo apt-get install ffmpeg
