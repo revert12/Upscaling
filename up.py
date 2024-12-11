@@ -2,9 +2,11 @@
 
 import os
 import cv2
+import time
 from basicsr.archs.rrdbnet_arch import RRDBNet
 from realesrgan import RealESRGANer
 import ffmpeg
+import psutil
 
 # 동영상의 fps를 자동으로 추출하는 함수
 def get_video_fps(video_path):
@@ -29,6 +31,30 @@ def extract_frames(video_path, output_folder, fps):
         print(f"프레임 추출 오류 발생: {e}")
         raise
 
+# GPU의 메모리 상태를 확인하고 최적의 tile 크기를 반환하는 함수
+def get_optimal_tile_size():
+    try:
+        # 현재 시스템의 GPU 메모리 상태를 확인
+        memory_info = psutil.virtual_memory()  # 시스템 메모리 정보를 얻음
+        total_memory = memory_info.total
+        available_memory = memory_info.available
+
+        # 메모리 여유에 따라 tile 크기를 동적으로 결정 (여유 메모리 비율에 따른 tile 크기 조정)
+        memory_ratio = available_memory / total_memory
+
+        # 여유 메모리 비율에 따른 tile 크기 결정
+        if memory_ratio > 0.8:
+            return 2048  # 메모리 여유가 많으면 더 큰 tile 사용
+        elif memory_ratio > 0.5:
+            return 1024  # 메모리 여유가 적당하면 중간 크기 tile 사용
+        elif memory_ratio > 0.2:
+            return 512   # 여유 메모리가 적으면 작은 tile 사용
+        else:
+            return 512   # 메모리가 매우 부족해도 최소 512로 설정
+    except Exception as e:
+        print(f"메모리 상태 확인 중 오류 발생: {e}")
+        return 512  # 기본적으로 작은 tile 크기
+
 # 프레임을 업스케일하는 함수
 def upscale_frames(input_folder, output_folder, model_name="RealESRGAN_x2plus"):
     try:
@@ -38,11 +64,16 @@ def upscale_frames(input_folder, output_folder, model_name="RealESRGAN_x2plus"):
             print(f"경고: 모델 파일이 존재하지 않습니다: {model_path}")
             return
         
-        # 타일 크기를 줄여 메모리 사용량을 최적화
-        upsampler = RealESRGANer(scale=2, model_path=model_path, model=model, tile=4, tile_pad=10, pre_pad=0)
+        # 타일 크기를 메모리 상태에 따라 동적으로 설정
+        tile_size = get_optimal_tile_size()
+        print(f"현재 GPU 메모리 상태에 따른 최적의 tile 크기: {tile_size}")
+
+        upsampler = RealESRGANer(scale=2, model_path=model_path, model=model, tile=tile_size, tile_pad=10, pre_pad=0)
         
         os.makedirs(output_folder, exist_ok=True)
-        
+        # 프레임을 업스케일링
+        frame_counter = 1  # 이미지 번호를 추적하는 변수
+       
         for frame_name in sorted(os.listdir(input_folder)):
             if frame_name.endswith(".png"):
                 frame_path = os.path.join(input_folder, frame_name)
@@ -50,9 +81,16 @@ def upscale_frames(input_folder, output_folder, model_name="RealESRGAN_x2plus"):
                 if img is None:
                     print(f"경고: 이미지 로드 실패 - {frame_path}")
                     continue
+
+                print(f"처리 중: {frame_counter}번째 이미지 - {frame_name}")  # 현재 처리 중인 이미지 번호 출력
                 output, _ = upsampler.enhance(img, outscale=2)  # 2배 업스케일
                 upscaled_frame_path = os.path.join(output_folder, frame_name)
                 cv2.imwrite(upscaled_frame_path, output)
+
+                frame_counter += 1  # 처리된 이미지 번호 증가
+                # 주기적으로 GPU 메모리 상태 갱신
+                time.sleep(5)  # 1초마다 메모리 상태 갱신
+
     except Exception as e:
         print(f"프레임 업스케일 오류 발생: {e}")
         raise
@@ -127,7 +165,7 @@ def upscale_video(input_video_path, output_video_path, resolution="FHD (1920 x 1
 
         print(f"최종 해상도: {final_width}x{final_height}, 비율: {aspect_ratio}")
 
-        # 동영상 프레임 추출
+        #동영상 프레임 추출
         print("동영상 프레임 추출 중...")
         extract_frames(input_video_path, temp_frame_folder, fps)
         
