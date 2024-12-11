@@ -38,5 +38,21 @@ pip3 install -r requirements.txt
 # 5. 개발 환경 설정
 echo "Setting up Real-ESRGAN..."
  python3 setup.py develop  --user
+# 6. 업스케일에 사용할 모델 다운로드
+# 다운로드할 URL
+MODEL_URL="https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.1/RealESRGAN_x2plus.pth"
 
+# 다운로드 받을 파일 경로
+OUTPUT_PATH="./Real-ESRGAN-master/weights/RealESRGAN_x2plus.pth"
+
+# 파일 다운로드
+echo "모델 파일 다운로드 중..."
+wget -O "$OUTPUT_PATH" "$MODEL_URL"
+
+# 다운로드 완료 확인
+if [ -f "$OUTPUT_PATH" ]; then
+    echo "다운로드 완료: $OUTPUT_PATH"
+else
+    echo "다운로드 실패"
+fi
 echo "Setup complete. Real-ESRGAN is now ready to use."
