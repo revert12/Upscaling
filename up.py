@@ -2,11 +2,10 @@
 
 import os
 import cv2
-import time
 from basicsr.archs.rrdbnet_arch import RRDBNet
 from realesrgan import RealESRGANer
 import ffmpeg
-import psutil
+import subprocess
 
 # 동영상의 fps를 자동으로 추출하는 함수
 def get_video_fps(video_path):
@@ -31,29 +30,45 @@ def extract_frames(video_path, output_folder, fps):
         print(f"프레임 추출 오류 발생: {e}")
         raise
 
-# GPU의 메모리 상태를 확인하고 최적의 tile 크기를 반환하는 함수
+
+def get_gpu_memory():
+    try:
+        # nvidia-smi 명령어로 GPU 메모리 정보를 얻기
+        result = subprocess.run(['nvidia-smi', '--query-gpu=memory.total,memory.free', '--format=csv,noheader,nounits'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        
+        # 결과를 파싱하여 GPU 메모리 정보 얻기
+        output = result.stdout.decode('utf-8').strip().split(', ')
+        total_memory = int(output[0])  # 총 메모리
+        available_memory = int(output[1])  # 사용 가능한 메모리
+        
+        return total_memory, available_memory
+    
+    except Exception as e:
+        print(f"GPU 메모리 상태 확인 중 오류 발생: {e}")
+        return None, None
+
 def get_optimal_tile_size():
     try:
-        # 현재 시스템의 GPU 메모리 상태를 확인
-        memory_info = psutil.virtual_memory()  # 시스템 메모리 정보를 얻음
-        total_memory = memory_info.total
-        available_memory = memory_info.available
+        total_memory, available_memory = get_gpu_memory()
+        
+        if total_memory is None or available_memory is None:
+            print("GPU 메모리 정보를 얻을 수 없습니다.")
+            return 4096  # 기본 값 설정
 
-        # 메모리 여유에 따라 tile 크기를 동적으로 결정 (여유 메모리 비율에 따른 tile 크기 조정)
+        # GPU 메모리 여유에 따라 tile 크기 결정
         memory_ratio = available_memory / total_memory
 
-        # 여유 메모리 비율에 따른 tile 크기 결정
         if memory_ratio > 0.8:
-            return 2048  # 메모리 여유가 많으면 더 큰 tile 사용
+            return 16364  # 여유 메모리가 많으면 큰 tile
         elif memory_ratio > 0.5:
-            return 1024  # 메모리 여유가 적당하면 중간 크기 tile 사용
+            return 8182  # 여유 메모리가 적당하면 중간 크기 tile
         elif memory_ratio > 0.2:
-            return 512   # 여유 메모리가 적으면 작은 tile 사용
+            return 4096  # 여유 메모리가 부족하면 작은 tile
         else:
-            return 512   # 메모리가 매우 부족해도 최소 512로 설정
+            return 4096  # 여유 메모리가 매우 부족하면 최소 크기 tile
     except Exception as e:
-        print(f"메모리 상태 확인 중 오류 발생: {e}")
-        return 512  # 기본적으로 작은 tile 크기
+        print(f"GPU 메모리 상태 확인 중 오류 발생: {e}")
+        return 4096  # 예외가 발생하면 기본적으로 작은 tile 크기
 
 # 프레임을 업스케일하는 함수
 def upscale_frames(input_folder, output_folder, model_name="RealESRGAN_x2plus"):
@@ -73,6 +88,7 @@ def upscale_frames(input_folder, output_folder, model_name="RealESRGAN_x2plus"):
         os.makedirs(output_folder, exist_ok=True)
         # 프레임을 업스케일링
         frame_counter = 1  # 이미지 번호를 추적하는 변수
+        memory_update_interval = 10  # GPU 메모리 상태 갱신 주기 (예: 10번째 프레임마다)
        
         for frame_name in sorted(os.listdir(input_folder)):
             if frame_name.endswith(".png"):
@@ -89,7 +105,11 @@ def upscale_frames(input_folder, output_folder, model_name="RealESRGAN_x2plus"):
 
                 frame_counter += 1  # 처리된 이미지 번호 증가
                 # 주기적으로 GPU 메모리 상태 갱신
-                time.sleep(5)  # 1초마다 메모리 상태 갱신
+                if frame_counter % memory_update_interval == 0:
+                    tile_size = get_optimal_tile_size()  # 메모리 상태 갱신
+                    print(f"GPU 메모리 상태 갱신: {tile_size}로 설정")
+                
+                
 
     except Exception as e:
         print(f"프레임 업스케일 오류 발생: {e}")
@@ -166,8 +186,8 @@ def upscale_video(input_video_path, output_video_path, resolution="FHD (1920 x 1
         print(f"최종 해상도: {final_width}x{final_height}, 비율: {aspect_ratio}")
 
         #동영상 프레임 추출
-        print("동영상 프레임 추출 중...")
-        extract_frames(input_video_path, temp_frame_folder, fps)
+        #print("동영상 프레임 추출 중...")
+        #extract_frames(input_video_path, temp_frame_folder, fps)
         
         # 프레임 업스케일링
         print("프레임 업스케일링 중...")
